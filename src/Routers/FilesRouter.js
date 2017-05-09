@@ -51,6 +51,7 @@ export class FilesRouter {
         res.status(200);
         res.set('Content-Type', contentType);
         res.set('Content-Length', data.length);
+        res.set('Cache-Control', 'public');
         res.end(data);
       }).catch(() => {
         res.status(404);
