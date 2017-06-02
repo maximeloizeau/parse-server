@@ -28,6 +28,7 @@ const parseTypeToPostgresType = type => {
   case 'Pointer': return 'char(10)';
   case 'Number': return 'double precision';
   case 'GeoPoint': return 'point';
+  case 'Bytes': return 'jsonb';
   case 'Array':
     if (type.contents && type.contents.type === 'String') {
       return 'text[]';
@@ -58,7 +59,8 @@ const toPostgresValue = value => {
 }
 
 const transformValue = value => {
-  if (value.__type === 'Pointer') {
+  if (typeof value === 'object' &&
+        value.__type === 'Pointer') {
     return value.objectId;
   }
   return value;
@@ -344,6 +346,34 @@ const buildWhereClause = ({ schema, query, index }) => {
       index += 2;
     }
 
+    if (fieldValue.$geoWithin && fieldValue.$geoWithin.$polygon) {
+      const polygon = fieldValue.$geoWithin.$polygon;
+      if (!(polygon instanceof Array)) {
+        throw new Parse.Error(
+          Parse.Error.INVALID_JSON,
+          'bad $geoWithin value; $polygon should contain at least 3 GeoPoints'
+        );
+      }
+      if (polygon.length < 3) {
+        throw new Parse.Error(
+          Parse.Error.INVALID_JSON,
+          'bad $geoWithin value; $polygon should contain at least 3 GeoPoints'
+        );
+      }
+      const points = polygon.map((point) => {
+        if (typeof point !== 'object' || point.__type !== 'GeoPoint') {
+          throw new Parse.Error(Parse.Error.INVALID_JSON, 'bad $geoWithin value');
+        } else {
+          Parse.GeoPoint._validate(point.latitude, point.longitude);
+        }
+        return `(${point.longitude}, ${point.latitude})`;
+      }).join(', ');
+
+      patterns.push(`$${index}:name::point <@ $${index + 1}::polygon`);
+      values.push(fieldName, `(${points})`);
+      index += 2;
+    }
+
     if (fieldValue.$regex) {
       let regex = fieldValue.$regex;
       let operator = '~';
@@ -380,6 +410,12 @@ const buildWhereClause = ({ schema, query, index }) => {
       patterns.push(`$${index}:name = $${index + 1}`);
       values.push(fieldName, fieldValue.iso);
       index += 2;
+    }
+
+    if (fieldValue.__type === 'GeoPoint') {
+      patterns.push('$' + index + ':name ~= POINT($' + (index + 1) + ', $' + (index + 2) + ')');
+      values.push(fieldName, fieldValue.longitude, fieldValue.latitude);
+      index += 3;
     }
 
     Object.keys(ParseToPosgresComparator).forEach(cmp => {
@@ -564,14 +600,12 @@ export class PostgresStorageAdapter {
   // Drops a collection. Resolves with true if it was a Parse Schema (eg. _User, Custom, etc.)
   // and resolves with false if it wasn't (eg. a join table). Rejects if deletion was impossible.
   deleteClass(className) {
-    return Promise.resolve().then(() => {
-      const operations = [[`DROP TABLE IF EXISTS $1:name`, [className]],
-        [`DELETE FROM "_SCHEMA" WHERE "className"=$1`, [className]]];
-      return this._client.tx(t=>t.batch(operations.map(statement=>t.none(statement[0], statement[1]))));
-    }).then(() => {
-      // resolves with false when _Join table
-      return className.indexOf('_Join:') != 0;
-    });
+    const operations = [
+      {query: `DROP TABLE IF EXISTS $1:name`, values: [className]},
+      {query: `DELETE FROM "_SCHEMA" WHERE "className" = $1`, values: [className]}
+    ];
+    return this._client.tx(t => t.none(this._pgp.helpers.concat(operations)))
+      .then(() => className.indexOf('_Join:') != 0); // resolves with false when _Join table
   }
 
   // Delete all data known to this adapter. Used for testing.
@@ -736,6 +770,7 @@ export class PostgresStorageAdapter {
         }
         break;
       case 'Object':
+      case 'Bytes':
       case 'String':
       case 'Number':
       case 'Boolean':
@@ -778,7 +813,7 @@ export class PostgresStorageAdapter {
     const qs = `INSERT INTO $1:name (${columnsPattern}) VALUES (${valuesPattern})`
     const values = [className, ...columnsArray, ...valuesArray]
     debug(qs, values);
-    return this._client.any(qs, values)
+    return this._client.none(qs, values)
     .then(() => ({ ops: [object] }))
     .catch(error => {
       if (error.code === PostgresUniqueIndexViolationError) {
@@ -922,7 +957,7 @@ export class PostgresStorageAdapter {
         index += 2;
       } else if (fieldValue.__type === 'GeoPoint') {
         updatePatterns.push(`$${index}:name = POINT($${index + 1}, $${index + 2})`);
-        values.push(fieldName, fieldValue.latitude, fieldValue.longitude);
+        values.push(fieldName, fieldValue.longitude, fieldValue.latitude);
         index += 3;
       } else if (fieldValue.__type === 'Relation') {
         // noop
@@ -993,7 +1028,7 @@ export class PostgresStorageAdapter {
 
     const qs = `UPDATE $1:name SET ${updatePatterns.join(',')} WHERE ${where.pattern} RETURNING *`;
     debug('update: ', qs, values);
-    return this._client.any(qs, values); // TODO: This is unsafe, verification is needed, or a different query method;
+    return this._client.any(qs, values);
   }
 
   // Hopefully, we can get rid of this. It's only used for config and hooks.

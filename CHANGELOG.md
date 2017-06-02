@@ -1,5 +1,38 @@
 ## Parse Server Changelog
 
+### 2.4.2
+[Full Changelog](https://github.com/ParsePlatform/parse-server/compare/2.4.1...2.4.2)
+
+#### New Features:
+* ParseQuery: Support for withinPolygon [#3866](https://github.com/parse-community/parse-server/pull/3866), thanks to [Diamond Lewis](https://github.com/dplewis)
+
+#### Improvements:
+* Postgres: Use transactions when deleting a class, [#3869](https://github.com/parse-community/parse-server/pull/3836), thanks to [Vitaly Tomilov](https://github.com/vitaly-t)
+* Postgres: Proper support for GeoPoint equality query, [#3874](https://github.com/parse-community/parse-server/pull/3836), thanks to [Diamond Lewis](https://github.com/dplewis)
+* beforeSave and liveQuery will be correctly triggered on email verification [#3851](https://github.com/parse-community/parse-server/pull/3851), thanks to [Florent Vilmart](https://github.com/flovilmart)
+
+#### Bug fixes:
+* Skip authData validation if it hasn't changed, on PUT requests [#3872](https://github.com/parse-community/parse-server/pull/3872), thanks to [Florent Vilmart](https://github.com/flovilmart)
+
+#### Dependency Updates:
+* [mongodb@2.2.27](https://www.npmjs.com/package/mongodb)
+* [pg-promise@5.7.2](https://www.npmjs.com/package/pg-promise)
+
+
+### 2.4.1
+[Full Changelog](https://github.com/ParsePlatform/parse-server/compare/2.4.0...2.4.1)
+
+#### Bug fixes:
+* Fixes issue affecting relation updates ([#3835](https://github.com/parse-community/parse-server/pull/3835), [#3836](https://github.com/parse-community/parse-server/pull/3836)), thanks to [Florent Vilmart](https://github.com/flovilmart)
+* Fixes issue affecting sending push notifications, thanks to [Felipe Andrade](https://github.com/felipemobile)
+* Session are always cleared when updating the passwords ([#3289](https://github.com/parse-community/parse-server/pull/3289), [#3821](https://github.com/parse-community/parse-server/pull/3821), thanks to [Florent Vilmart](https://github.com/flovilmart)
+
+#### Dependency Updates:
+* [body-parser@1.17.2](https://www.npmjs.com/package/body-parser)
+* [pg-promise@5.7.1](https://www.npmjs.com/package/pg-promise)
+* [ws@3.0.0](https://www.npmjs.com/package/ws)
+
+
 ### 2.4.0
 [Full Changelog](https://github.com/ParsePlatform/parse-server/compare/2.3.8...2.4.0)
 
