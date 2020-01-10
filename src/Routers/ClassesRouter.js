@@ -27,13 +27,6 @@ export class ClassesRouter extends PromiseRouter {
     }
     return rest.find(req.config, req.auth, this.className(req), body.where, options, req.info.clientSDK)
       .then((response) => {
-        if (response && response.results) {
-          for (const result of response.results) {
-            if (result.sessionToken) {
-              result.sessionToken = req.info.sessionToken || result.sessionToken;
-            }
-          }
-        }
         return { response: response };
       });
   }
@@ -107,7 +100,7 @@ export class ClassesRouter extends PromiseRouter {
 
   static optionsFromBody(body) {
     const allowConstraints = ['skip', 'limit', 'order', 'count', 'keys',
-      'include', 'redirectClassNameForKey', 'where'];
+      'include', 'includeAll', 'redirectClassNameForKey', 'where'];
 
     for (const key of Object.keys(body)) {
       if (allowConstraints.indexOf(key) === -1) {
@@ -134,6 +127,9 @@ export class ClassesRouter extends PromiseRouter {
     }
     if (body.include) {
       options.include = String(body.include);
+    }
+    if (body.includeAll) {
+      options.includeAll = true;
     }
     return options;
   }

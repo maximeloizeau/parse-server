@@ -1,11 +1,19 @@
 /** @flow weak */
 
 import * as triggers        from "../triggers";
+// @flow-disable-next
 import * as Parse           from "parse/node";
+// @flow-disable-next
 import * as request         from "request";
 import { logger }           from '../logger';
+import http                 from 'http';
+import https                from 'https';
 
 const DefaultHooksCollectionName = "_Hooks";
+const HTTPAgents = {
+  http: new http.Agent({ keepAlive: true }),
+  https: new https.Agent({ keepAlive: true }),
+}
 
 export class HooksController {
   _applicationId:string;
@@ -28,7 +36,7 @@ export class HooksController {
   }
 
   getFunction(functionName) {
-    return this._getHooks({ functionName: functionName }, 1).then(results => results[0]);
+    return this._getHooks({ functionName: functionName }).then(results => results[0]);
   }
 
   getFunctions() {
@@ -36,7 +44,7 @@ export class HooksController {
   }
 
   getTrigger(className, triggerName) {
-    return this._getHooks({ className: className, triggerName: triggerName }, 1).then(results => results[0]);
+    return this._getHooks({ className: className, triggerName: triggerName }).then(results => results[0]);
   }
 
   getTriggers() {
@@ -175,8 +183,11 @@ function wrapToHTTPRequest(hook, key) {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(jsonBody)
+      body: JSON.stringify(jsonBody),
     };
+
+    const agent = hook.url.startsWith('https') ? HTTPAgents['https'] : HTTPAgents['http'];
+    jsonRequest.agent = agent;
 
     if (key) {
       jsonRequest.headers['X-Parse-Webhook-Key'] = key;

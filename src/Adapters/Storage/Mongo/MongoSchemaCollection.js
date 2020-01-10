@@ -63,13 +63,20 @@ const defaultCLPS = Object.freeze({
 
 function mongoSchemaToParseSchema(mongoSchema) {
   let clps = defaultCLPS;
-  if (mongoSchema._metadata && mongoSchema._metadata.class_permissions) {
-    clps = {...emptyCLPS, ...mongoSchema._metadata.class_permissions};
+  let indexes = {}
+  if (mongoSchema._metadata) {
+    if (mongoSchema._metadata.class_permissions) {
+      clps = {...emptyCLPS, ...mongoSchema._metadata.class_permissions};
+    }
+    if (mongoSchema._metadata.indexes) {
+      indexes = {...mongoSchema._metadata.indexes};
+    }
   }
   return {
     className: mongoSchema._id,
     fields: mongoSchemaFieldsToParseSchemaFields(mongoSchema),
     classLevelPermissions: clps,
+    indexes: indexes,
   };
 }
 
@@ -128,6 +135,18 @@ class MongoSchemaCollection {
   // Atomically find and delete an object based on query.
   findAndDeleteSchema(name: string) {
     return this._collection._mongoCollection.findAndRemove(_mongoSchemaQueryFromNameQuery(name), []);
+  }
+
+  insertSchema(schema: any) {
+    return this._collection.insertOne(schema)
+      .then(result => mongoSchemaToParseSchema(result.ops[0]))
+      .catch(error => {
+        if (error.code === 11000) { //Mongo's duplicate key error
+          throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'Class already exists.');
+        } else {
+          throw error;
+        }
+      })
   }
 
   updateSchema(name: string, update) {
