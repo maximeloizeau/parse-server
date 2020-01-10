@@ -224,6 +224,9 @@ export function getResponseObject(request, resolve, reject) {
     },
     error: function(code, message) {
       if (!message) {
+        if (code instanceof Parse.Error) {
+          return reject(code)
+        }
         message = code;
         code = Parse.Error.SCRIPT_FAILED;
       }
@@ -355,6 +358,10 @@ export function maybeRunQueryTrigger(triggerType, className, restWhere, restOpti
     if (jsonQuery.keys) {
       restOptions = restOptions || {};
       restOptions.keys = jsonQuery.keys;
+    }
+    if (jsonQuery.order) {
+      restOptions = restOptions || {};
+      restOptions.order = jsonQuery.order;
     }
     if (requestObject.readPreference) {
       restOptions = restOptions || {};

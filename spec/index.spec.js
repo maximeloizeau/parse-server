@@ -1,12 +1,12 @@
 "use strict"
-var request = require('request');
-var parseServerPackage = require('../package.json');
-var MockEmailAdapterWithOptions = require('./MockEmailAdapterWithOptions');
-var ParseServer = require("../src/index");
-var Config = require('../src/Config');
-var express = require('express');
+const request = require('request');
+const parseServerPackage = require('../package.json');
+const MockEmailAdapterWithOptions = require('./MockEmailAdapterWithOptions');
+const ParseServer = require("../lib/index");
+const Config = require('../lib/Config');
+const express = require('express');
 
-const MongoStorageAdapter = require('../src/Adapters/Storage/Mongo/MongoStorageAdapter');
+const MongoStorageAdapter = require('../lib/Adapters/Storage/Mongo/MongoStorageAdapter').default;
 
 describe('server', () => {
   it('requires a master key and app id', done => {
@@ -108,7 +108,7 @@ describe('server', () => {
       appName: 'unused',
       verifyUserEmails: true,
       emailAdapter: {
-        module: 'parse-server-simple-mailgun-adapter',
+        module: '@parse/simple-mailgun-adapter',
         options: {
           fromAddress: 'parse@example.com',
           apiKey: 'k',
@@ -123,7 +123,7 @@ describe('server', () => {
     reconfigureServer({
       appName: 'unused',
       verifyUserEmails: true,
-      emailAdapter: 'parse-server-simple-mailgun-adapter',
+      emailAdapter: '@parse/simple-mailgun-adapter',
       publicServerURL: 'http://localhost:8378/1'
     })
       .catch(error => {
@@ -137,7 +137,7 @@ describe('server', () => {
       appName: 'unused',
       verifyUserEmails: true,
       emailAdapter: {
-        module: 'parse-server-simple-mailgun-adapter',
+        module: '@parse/simple-mailgun-adapter',
         options: {
           domain: 'd',
         }
@@ -270,7 +270,7 @@ describe('server', () => {
   });
 
   it('can create a parse-server v1', done => {
-    var parseServer = new ParseServer.default(Object.assign({},
+    const parseServer = new ParseServer.default(Object.assign({},
       defaultConfiguration, {
         appId: "aTestApp",
         masterKey: "aTestMasterKey",
@@ -279,15 +279,15 @@ describe('server', () => {
           promise
             .then(() => {
               expect(Parse.applicationId).toEqual("aTestApp");
-              var app = express();
+              const app = express();
               app.use('/parse', parseServer.app);
 
-              var server = app.listen(12666);
-              var obj  = new Parse.Object("AnObject");
-              var objId;
+              const server = app.listen(12666);
+              const obj  = new Parse.Object("AnObject");
+              let objId;
               obj.save().then((obj) => {
                 objId = obj.id;
-                var q = new Parse.Query("AnObject");
+                const q = new Parse.Query("AnObject");
                 return q.first();
               }).then((obj) => {
                 expect(obj.id).toEqual(objId);
@@ -350,7 +350,7 @@ describe('server', () => {
 
   it('exposes correct adapters', done => {
     expect(ParseServer.S3Adapter).toThrow();
-    expect(ParseServer.GCSAdapter).toThrow('GCSAdapter is not provided by parse-server anymore; please install parse-server-gcs-adapter');
+    expect(ParseServer.GCSAdapter).toThrow('GCSAdapter is not provided by parse-server anymore; please install @parse/gcs-files-adapter');
     expect(ParseServer.FileSystemAdapter).toThrow();
     expect(ParseServer.InMemoryCacheAdapter).toThrow();
     expect(ParseServer.NullCacheAdapter).toThrow();
@@ -360,7 +360,7 @@ describe('server', () => {
   it('properly gives publicServerURL when set', done => {
     reconfigureServer({ publicServerURL: 'https://myserver.com/1' })
       .then(() => {
-        var config = Config.get('test', 'http://localhost:8378/1');
+        const config = Config.get('test', 'http://localhost:8378/1');
         expect(config.mount).toEqual('https://myserver.com/1');
         done();
       });
@@ -369,7 +369,7 @@ describe('server', () => {
   it('properly removes trailing slash in mount', done => {
     reconfigureServer({})
       .then(() => {
-        var config = Config.get('test', 'http://localhost:8378/1/');
+        const config = Config.get('test', 'http://localhost:8378/1/');
         expect(config.mount).toEqual('http://localhost:8378/1');
         done();
       });

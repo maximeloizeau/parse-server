@@ -1,6 +1,6 @@
 'use strict';
 
-const MongoSchemaCollection = require('../src/Adapters/Storage/Mongo/MongoSchemaCollection').default;
+const MongoSchemaCollection = require('../lib/Adapters/Storage/Mongo/MongoSchemaCollection').default;
 
 describe('MongoSchemaCollection', () => {
   it('can transform legacy _client_permissions keys to parse format', done => {
@@ -21,6 +21,9 @@ describe('MongoSchemaCollection', () => {
           "create":{"*":true},
           "delete":{"*":true},
           "addField":{"*":true},
+        },
+        "indexes": {
+          "name1":{"deviceToken":1}
         }
       },
       "installationId":"string",
@@ -66,7 +69,10 @@ describe('MongoSchemaCollection', () => {
         update: { '*': true },
         delete: { '*': true },
         addField: { '*': true },
-      }
+      },
+      indexes: {
+        name1: {deviceToken: 1}
+      },
     });
     done();
   });

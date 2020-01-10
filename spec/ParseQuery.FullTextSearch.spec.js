@@ -1,8 +1,8 @@
 'use strict';
 
-const MongoStorageAdapter = require('../src/Adapters/Storage/Mongo/MongoStorageAdapter');
+const MongoStorageAdapter = require('../lib/Adapters/Storage/Mongo/MongoStorageAdapter').default;
 const mongoURI = 'mongodb://localhost:27017/parseServerMongoAdapterTestDatabase';
-const PostgresStorageAdapter = require('../src/Adapters/Storage/Postgres/PostgresStorageAdapter');
+const PostgresStorageAdapter = require('../lib/Adapters/Storage/Postgres/PostgresStorageAdapter').default;
 const postgresURI = 'postgres://localhost:5432/parse_server_postgres_adapter_test_database';
 const Parse = require('parse/node');
 const rp = require('request-promise');
@@ -31,7 +31,8 @@ const fullTextHelper = () => {
     const request = {
       method: "POST",
       body: {
-        subject: subjects[i]
+        subject: subjects[i],
+        comment: subjects[i],
       },
       path: "/1/classes/TestObject"
     };
@@ -279,43 +280,19 @@ describe('Parse.Query Full Text Search testing', () => {
   });
 });
 
-describe_only_db('mongo')('Parse.Query Full Text Search testing', () => {
-  it('fullTextSearch: $search, only one text index', (done) => {
-    return reconfigureServer({
-      appId: 'test',
-      restAPIKey: 'test',
-      publicServerURL: 'http://localhost:8378/1',
-      databaseAdapter: new MongoStorageAdapter({ uri: mongoURI })
+describe_only_db('mongo')('[mongodb] Parse.Query Full Text Search testing', () => {
+  it('fullTextSearch: does not create text index if compound index exist', (done) => {
+    fullTextHelper().then(() => {
+      return databaseAdapter.dropAllIndexes('TestObject');
     }).then(() => {
-      return rp.post({
-        url: 'http://localhost:8378/1/batch',
-        body: {
-          requests: [
-            {
-              method: "POST",
-              body: {
-                subject: "coffee is java"
-              },
-              path: "/1/classes/TestObject"
-            },
-            {
-              method: "POST",
-              body: {
-                subject: "java is coffee"
-              },
-              path: "/1/classes/TestObject"
-            }
-          ]
-        },
-        json: true,
-        headers: {
-          'X-Parse-Application-Id': 'test',
-          'X-Parse-REST-API-Key': 'test'
-        }
-      });
+      return databaseAdapter.getIndexes('TestObject');
+    }).then((indexes) => {
+      expect(indexes.length).toEqual(1);
+      return databaseAdapter.createIndex('TestObject', {subject: 'text', comment: 'text'});
     }).then(() => {
-      return databaseAdapter.createIndex('TestObject', {random: 'text'});
-    }).then(() => {
+      return databaseAdapter.getIndexes('TestObject');
+    }).then((indexes) => {
+      expect(indexes.length).toEqual(2);
       const where = {
         subject: {
           $text: {
@@ -334,12 +311,91 @@ describe_only_db('mongo')('Parse.Query Full Text Search testing', () => {
         }
       });
     }).then((resp) => {
-      fail(`Should not be more than one text index: ${JSON.stringify(resp)}`);
-      done();
-    }).catch((err) => {
-      expect(err.error.code).toEqual(Parse.Error.INTERNAL_SERVER_ERROR);
-      done();
-    });
+      expect(resp.results.length).toEqual(3);
+      return databaseAdapter.getIndexes('TestObject');
+    }).then((indexes) => {
+      expect(indexes.length).toEqual(2);
+      rp.get({
+        url: 'http://localhost:8378/1/schemas/TestObject',
+        headers: {
+          'X-Parse-Application-Id': 'test',
+          'X-Parse-Master-Key': 'test',
+        },
+        json: true,
+      }, (error, response, body) => {
+        expect(body.indexes._id_).toBeDefined();
+        expect(body.indexes._id_._id).toEqual(1);
+        expect(body.indexes.subject_text_comment_text).toBeDefined();
+        expect(body.indexes.subject_text_comment_text.subject).toEqual('text');
+        expect(body.indexes.subject_text_comment_text.comment).toEqual('text');
+        done();
+      });
+    }).catch(done.fail);
+  });
+
+  it('fullTextSearch: does not create text index if schema compound index exist', (done) => {
+    fullTextHelper().then(() => {
+      return databaseAdapter.dropAllIndexes('TestObject');
+    }).then(() => {
+      return databaseAdapter.getIndexes('TestObject');
+    }).then((indexes) => {
+      expect(indexes.length).toEqual(1);
+      return rp.put({
+        url: 'http://localhost:8378/1/schemas/TestObject',
+        json: true,
+        headers: {
+          'X-Parse-Application-Id': 'test',
+          'X-Parse-REST-API-Key': 'test',
+          'X-Parse-Master-Key': 'test',
+        },
+        body: {
+          indexes: {
+            text_test: { subject: 'text', comment: 'text'},
+          },
+        },
+      });
+    }).then(() => {
+      return databaseAdapter.getIndexes('TestObject');
+    }).then((indexes) => {
+      expect(indexes.length).toEqual(2);
+      const where = {
+        subject: {
+          $text: {
+            $search: {
+              $term: 'coffee'
+            }
+          }
+        }
+      };
+      return rp.post({
+        url: 'http://localhost:8378/1/classes/TestObject',
+        json: { where, '_method': 'GET' },
+        headers: {
+          'X-Parse-Application-Id': 'test',
+          'X-Parse-REST-API-Key': 'test'
+        }
+      });
+    }).then((resp) => {
+      expect(resp.results.length).toEqual(3);
+      return databaseAdapter.getIndexes('TestObject');
+    }).then((indexes) => {
+      expect(indexes.length).toEqual(2);
+      rp.get({
+        url: 'http://localhost:8378/1/schemas/TestObject',
+        headers: {
+          'X-Parse-Application-Id': 'test',
+          'X-Parse-Master-Key': 'test',
+        },
+        json: true,
+      }, (error, response, body) => {
+        expect(body.indexes._id_).toBeDefined();
+        expect(body.indexes._id_._id).toEqual(1);
+        expect(body.indexes.text_test).toBeDefined();
+        expect(body.indexes.text_test.subject).toEqual('text');
+        expect(body.indexes.text_test.comment).toEqual('text');
+        done();
+      });
+    }).catch(done.fail);
   });
 
   it('fullTextSearch: $diacriticSensitive - false', (done) => {
@@ -395,7 +451,7 @@ describe_only_db('mongo')('Parse.Query Full Text Search testing', () => {
   });
 });
 
-describe_only_db('postgres')('Parse.Query Full Text Search testing', () => {
+describe_only_db('postgres')('[postgres] Parse.Query Full Text Search testing', () => {
   it('fullTextSearch: $diacriticSensitive - false', (done) => {
     fullTextHelper().then(() => {
       const where = {
