@@ -1,4 +1,5 @@
 // @flow
+// @flow-disable-next
 import deepcopy               from 'deepcopy';
 import AdaptableController    from '../Controllers/AdaptableController';
 import { master }             from '../Auth';
@@ -41,12 +42,6 @@ export class PushWorker {
     }
   }
 
-  unsubscribe(): void {
-    if (this.subscriber) {
-      this.subscriber.unsubscribe(this.channel);
-    }
-  }
-
   run({ body, query, pushStatus, applicationId, UTCOffset }: any): Promise<*> {
     const config = Config.get(applicationId);
     const auth = master(config);
@@ -58,8 +53,6 @@ export class PushWorker {
         return;
       }
       return this.sendToAdapter(body, results, pushStatus, config, UTCOffset);
-    }, err => {
-      throw err;
     });
   }
 
